@@ -6,7 +6,7 @@ func TestNewStashId(t *testing.T) {
 	testPage := 1
 	testOffset := 2
 	expectString := "1:2"
-	id := newStashId(testPage, testOffset)
+	id := newPageIndex(testPage, testOffset)
 	if id.Page() != testPage {
 		t.Errorf("Unexpected page in stash id.  expected %d, found %d", testPage, id)
 	}
@@ -22,7 +22,7 @@ func TestInvalidStashId(t *testing.T) {
 	testPage := -1
 	testOffset := 2
 	expectString := "INVALID-ID"
-	id := newStashId(testPage, testOffset)
+	id := newPageIndex(testPage, testOffset)
 	if id.Page() != testPage {
 		t.Errorf("Unexpected page in stash id.  expected %d, found %d", testPage, id)
 	}

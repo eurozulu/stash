@@ -1,6 +1,9 @@
 package stash
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 var testBytes = [][]byte{
 	[]byte("Hello World"),
@@ -23,6 +26,9 @@ func TestMemoryStash_Put(t *testing.T) {
 	if s.Length() != len(testBytes) {
 		t.Errorf("Unexpected length putting in bytes.  Expected %d, found %d", len(testBytes), s.Length())
 	}
+	if err := compareIDs(ids, testByteIDs); err != nil {
+		t.Errorf("Unexpected ids putting in bytes.  Expected %v, found %v", testBytes, ids)
+	}
 
 	// put in the same data and ensure length remains unchanged
 	ids = s.Put(testBytes...)
@@ -32,10 +38,25 @@ func TestMemoryStash_Put(t *testing.T) {
 	if s.Length() != len(testBytes) {
 		t.Errorf("Unexpected length (re)putting in bytes.  Expected %d, found %d", len(testBytes), s.Length())
 	}
+	if err := compareIDs(ids, testByteIDs); err != nil {
+		t.Errorf("Unexpected ids putting in bytes.  Expected %v, found %v", testBytes, ids)
+	}
 }
 
-func buildByteIDs(byz [][]byte) []ByteID {
-	ids := make([]ByteID, len(byz))
+func compareIDs(ids, expectedIDs []StashId) error {
+	if len(ids) != len(expectedIDs) {
+		return fmt.Errorf("unexpected resturn IDs count. Expected %d, found %d", len(expectedIDs), len(ids))
+	}
+	for i := 0; i < len(ids); i++ {
+		if !ids[i].Equals(expectedIDs[i]) {
+			return fmt.Errorf("Unexpected ids putting in bytes.  Expected %v, found %v", expectedIDs, ids)
+		}
+	}
+	return nil
+}
+
+func buildByteIDs(byz [][]byte) []StashId {
+	ids := make([]StashId, len(byz))
 	for i, b := range byz {
 		ids[i] = ByteValue(b).ID()
 	}

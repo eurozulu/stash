@@ -1,7 +1,7 @@
 package stash
 
-// stashPage represents a slice of all the raw byte values held in the stash.
-
+// stashPage represents a shard of data in the stash.
+// The page contains 0 to PageSize elements, each a ByteValue (slice of bytes)
 type StashPage interface {
 	Count() int
 	Get(offset int) ByteValue

@@ -1,20 +1,22 @@
 package stash
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
-var InvalidStashID = newStashId(-1, -1)
+var InvalidStashID = StashId{}
 
 type Stash interface {
-	Put(v ...[]byte) []StashID
-	Get(id StashID) ([]byte, error)
-	ContainsId(id StashID) bool
-	ContainsValue(v []byte) (StashID, error)
+	Put(v ...[]byte) []StashId
+	Get(id StashId) ([]byte, error)
+	ContainsId(id StashId) bool
 	Length() int
 }
 
 type stash struct {
 	PageSize int
-	index    map[ByteID]StashID
+	index    map[StashId]pageIndex
 	pages    []StashPage
 }
 
@@ -22,46 +24,41 @@ func (s *stash) Length() int {
 	return len(s.index)
 }
 
-func (s *stash) Put(v ...[]byte) []StashID {
-	var ids []StashID
+func (s *stash) Put(v ...[]byte) []StashId {
+	var ids []StashId
 	for _, v := range v {
 		bv := ByteValue(v)
-		id, ok := s.index[bv.ID()]
-		if !ok {
+		id := bv.ID()
+		if !s.ContainsId(id) {
 			// Doesn't already exist.  Add to current page.
-			id = s.addToCurrentPage(bv)
+			index := s.addToCurrentPage(bv)
+			s.index[id] = index
 		}
 		ids = append(ids, id)
 	}
 	return ids
 }
 
-func (s stash) Get(id StashID) ([]byte, error) {
+func (s stash) Get(id StashId) ([]byte, error) {
 	if !s.ContainsId(id) {
 		return nil, fmt.Errorf("%s is not a valid page number", id.String())
 	}
-	pg := s.pages[id.Page()]
-	return pg.Get(id.Offset()), nil
+	index := s.index[id]
+	page := s.pages[index.Page()]
+	return page.Get(index.Offset()), nil
 }
 
-func (s stash) ContainsId(id StashID) bool {
-	pid := id.Page()
-	if pid < 0 || pid >= s.PageCount() {
+func (s stash) ContainsId(id StashId) bool {
+	index, ok := s.index[id]
+	if !ok {
 		return false
 	}
-	offset := id.Offset()
-	if offset < 0 || offset >= s.pages[pid].Count() {
+	if !s.isIndexValid(index) {
+		log.Printf("Invalid index: %s found, removing from index...", index.String())
+		delete(s.index, id)
 		return false
 	}
 	return true
-}
-
-func (s *stash) ContainsValue(v []byte) (StashID, error) {
-	id, ok := s.index[ByteValue(v).ID()]
-	if !ok {
-		return InvalidStashID, fmt.Errorf("v not known")
-	}
-	return id, nil
 }
 
 func (s stash) PageCount() int {
@@ -76,24 +73,34 @@ func (s *stash) currentPageIndex() int {
 	return pc - 1
 }
 
+func (s *stash) isIndexValid(index pageIndex) bool {
+	pid := index.Page()
+	if pid < 0 || pid >= s.PageCount() {
+		return false
+	}
+	offset := index.Offset()
+	if offset < 0 || offset >= s.pages[pid].Count() {
+		return false
+	}
+	return true
+}
+
 func (s *stash) addPage() int {
 	l := s.PageCount()
 	s.pages = append(s.pages, &memoryStashPage{})
 	return l
 }
 
-func (s *stash) addToCurrentPage(bv ByteValue) StashID {
+func (s *stash) addToCurrentPage(bv ByteValue) pageIndex {
 	pid := s.currentPageIndex()
 	offset := s.pages[pid].Put(bv)
-	id := newStashId(pid, offset)
-	s.index[bv.ID()] = id
-	return id
+	return newPageIndex(pid, offset)
 }
 
 func NewStash(pageSize int) Stash {
 	return &stash{
 		PageSize: pageSize,
-		index:    make(map[ByteID]StashID),
+		index:    make(map[StashId]pageIndex),
 		pages:    nil,
 	}
 }
